@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { Add, SportsSoccer, Edit } from "@mui/icons-material"
+import { Add, SportsSoccer, Edit, Delete } from "@mui/icons-material"
 import { supabaseHelpers } from "../../../lib/supabase"
 import { PageLoader } from "../../../components/LoadingSpinner"
 import { formatDate } from "../../../utils/helpers"
@@ -68,6 +68,18 @@ const MatchManager = () => {
     } catch (err) {
       setError(`Failed to ${editingMatch ? "update" : "create"} match`)
       console.error("Error saving match:", err)
+    }
+  }
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this match?")) return
+    try {
+      const { error } = await supabaseHelpers.deleteMatch(id)
+      if (error) throw error
+      setMatches(matches.filter((m) => m.id !== id))
+    } catch (err) {
+      setError("Failed to delete match")
+      console.error("Error deleting match:", err)
     }
   }
 
@@ -158,7 +170,7 @@ const MatchManager = () => {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-3">
                   <div className="font-semibold text-[#0b1b32]">KES {match.ticket_price}</div>
                   <button
                     onClick={() => openEditModal(match)}
@@ -166,6 +178,13 @@ const MatchManager = () => {
                     title="Edit Match"
                   >
                     <Edit className="h-5 w-5" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(match.id)}
+                    className="p-2 rounded-full hover:bg-red-100 text-red-600"
+                    title="Delete Match"
+                  >
+                    <Delete className="h-5 w-5" />
                   </button>
                 </div>
               </div>
