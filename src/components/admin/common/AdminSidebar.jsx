@@ -28,7 +28,7 @@ const AdminSidebar = ({ isOpen, onToggle, children }) => {
 
   return (
     <div className="relative flex">
-      {/* Overlay */}
+      {/* Overlay (mobile only) */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -45,10 +45,10 @@ const AdminSidebar = ({ isOpen, onToggle, children }) => {
 
       {/* Sidebar */}
       <AnimatePresence>
-        {isOpen && (
+        {(isOpen || window.innerWidth >= 1024) && (
           <motion.div
             key="sidebar"
-            initial={{ x: -280, opacity: 0 }}
+            initial={{ x: window.innerWidth < 1024 ? -280 : 0, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -280, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 100, damping: 20 }}
@@ -69,6 +69,7 @@ const AdminSidebar = ({ isOpen, onToggle, children }) => {
                   Admin Panel
                 </span>
               </div>
+              {/* Show X button only on mobile */}
               <button
                 onClick={onToggle}
                 className="lg:hidden p-1 text-[#26415E] hover:text-[#0B1B32]"
@@ -137,12 +138,12 @@ const AdminSidebar = ({ isOpen, onToggle, children }) => {
         )}
       </AnimatePresence>
 
-      {/* Main content with blur/scale when sidebar is open */}
+      {/* Main content with blur/scale when sidebar is open (mobile only) */}
       <motion.main
         className="flex-1"
         animate={{
-          scale: isOpen ? 0.97 : 1,
-          filter: isOpen ? 'blur(2px)' : 'blur(0px)',
+          scale: isOpen && window.innerWidth < 1024 ? 0.97 : 1,
+          filter: isOpen && window.innerWidth < 1024 ? 'blur(2px)' : 'blur(0px)',
         }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
       >
