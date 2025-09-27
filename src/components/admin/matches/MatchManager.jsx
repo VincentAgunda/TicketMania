@@ -9,9 +9,12 @@ const MatchManager = () => {
   const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [message, setMessage] = useState(null) // ✅ notification
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingMatch, setEditingMatch] = useState(null)
+  const [deletingMatch, setDeletingMatch] = useState(null) // ✅ for delete modal
+
   const [formData, setFormData] = useState({
     home_team: "",
     away_team: "",
@@ -23,12 +26,8 @@ const MatchManager = () => {
 
   useEffect(() => {
     fetchMatches()
-
-    // ✅ auto-open modal if redirected with ?add=new
     const params = new URLSearchParams(window.location.search)
-    if (params.get("add") === "new") {
-      openAddModal()
-    }
+    if (params.get("add") === "new") openAddModal()
   }, [])
 
   const fetchMatches = async () => {
@@ -42,6 +41,11 @@ const MatchManager = () => {
     } finally {
       setLoading(false)
     }
+  }
+
+  const showMessage = (text, type = "success") => {
+    setMessage({ text, type })
+    setTimeout(() => setMessage(null), 3000)
   }
 
   const handleSubmit = async (e) => {
@@ -58,9 +62,11 @@ const MatchManager = () => {
       if (editingMatch) {
         const { error } = await supabaseHelpers.updateMatch(editingMatch.id, matchData)
         if (error) throw error
+        showMessage("Match updated successfully ✅")
       } else {
         const { error } = await supabaseHelpers.createMatch(matchData)
         if (error) throw error
+        showMessage("Match created successfully 🎉")
       }
 
       await fetchMatches()
@@ -71,15 +77,22 @@ const MatchManager = () => {
     }
   }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this match?")) return
+  const confirmDelete = (match) => {
+    setDeletingMatch(match)
+  }
+
+  const handleDelete = async () => {
+    if (!deletingMatch) return
     try {
-      const { error } = await supabaseHelpers.deleteMatch(id)
+      const { error } = await supabaseHelpers.deleteMatch(deletingMatch.id)
       if (error) throw error
-      setMatches(matches.filter((m) => m.id !== id))
+      setMatches(matches.filter((m) => m.id !== deletingMatch.id))
+      showMessage("Match deleted 🗑️", "error")
     } catch (err) {
       setError("Failed to delete match")
       console.error("Error deleting match:", err)
+    } finally {
+      setDeletingMatch(null)
     }
   }
 
@@ -88,7 +101,7 @@ const MatchManager = () => {
     setFormData({
       home_team: "",
       away_team: "",
-      match_date: new Date().toISOString().slice(0, 16), // ✅ default to now
+      match_date: new Date().toISOString().slice(0, 16),
       venue: "",
       ticket_price: "",
       total_seats: ""
@@ -126,7 +139,7 @@ const MatchManager = () => {
   if (error) return <div className="text-center text-red-600 p-8">{error}</div>
 
   return (
-    <div className="min-h-screen bg-[#d6d8e0] p-6 space-y-6">
+    <div className="min-h-screen bg-[#d6d8e0] p-6 space-y-6 relative">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -152,7 +165,6 @@ const MatchManager = () => {
                 className="flex items-center justify-between p-3 bg-[#eeedf2] rounded-lg border border-[#c9ced8]"
               >
                 <div className="flex items-center space-x-3">
-                  {/* Ball icon in dark navy */}
                   <SportsSoccer className="h-8 w-8 text-[#0b1b32]" />
                   <div>
                     <div className="font-semibold text-[#0b1b32]">
@@ -180,7 +192,7 @@ const MatchManager = () => {
                     <Edit className="h-5 w-5" />
                   </button>
                   <button
-                    onClick={() => handleDelete(match.id)}
+                    onClick={() => confirmDelete(match)}
                     className="p-2 rounded-full hover:bg-red-100 text-red-600"
                     title="Delete Match"
                   >
@@ -198,7 +210,7 @@ const MatchManager = () => {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Match Form Modal */}
       <MatchModal
         isOpen={isModalOpen}
         onClose={closeModal}
@@ -207,6 +219,47 @@ const MatchManager = () => {
         setFormData={setFormData}
         editingMatch={editingMatch}
       />
+
+      {/* ✅ Glassmorphism Notification */}
+      {message && (
+        <div
+          className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-2xl shadow-lg backdrop-blur-md border
+          ${message.type === "error" ? "bg-red-500/30 text-red-800 border-red-400/50" : "bg-green-500/30 text-green-900 border-green-400/50"}
+        `}
+        >
+          {message.text}
+        </div>
+      )}
+
+      {/* ✅ Glassmorphism Delete Confirm Modal */}
+      {deletingMatch && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white/20 backdrop-blur-md border border-white/30 rounded-2xl shadow-lg p-6 w-full max-w-md text-center">
+            <h2 className="text-lg font-semibold text-[#0b1b32] mb-4">
+              Delete Match?
+            </h2>
+            <p className="text-[#5a5f6d] mb-6">
+              Are you sure you want to delete{" "}
+              <span className="font-bold">{deletingMatch.home_team} vs {deletingMatch.away_team}</span>?  
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={() => setDeletingMatch(null)}
+                className="px-4 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 text-[#0b1b32] font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 rounded-xl bg-red-500/80 hover:bg-red-600 text-white font-medium"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
