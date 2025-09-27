@@ -11,7 +11,7 @@ import {
 import { useAuth } from '../../../context/AuthContext'
 import { motion, AnimatePresence } from 'framer-motion'
 
-const AdminSidebar = ({ isOpen, onToggle }) => {
+const AdminSidebar = ({ isOpen, onToggle, children }) => {
   const { user, signOut } = useAuth()
   const location = useLocation()
 
@@ -27,16 +27,18 @@ const AdminSidebar = ({ isOpen, onToggle }) => {
   }
 
   return (
-    <>
-      {/* Mobile Overlay */}
+    <div className="relative flex">
+      {/* Overlay */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
+            key="overlay"
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden"
             onClick={onToggle}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
           />
         )}
       </AnimatePresence>
@@ -45,10 +47,11 @@ const AdminSidebar = ({ isOpen, onToggle }) => {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ x: -300, opacity: 0 }}
+            key="sidebar"
+            initial={{ x: -280, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -300, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 80, damping: 20 }}
+            exit={{ x: -280, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 100, damping: 20 }}
             className={`
               fixed lg:static inset-y-0 left-0 z-50
               w-72 bg-[#DDDDDD]/90 backdrop-blur-xl
@@ -107,7 +110,9 @@ const AdminSidebar = ({ isOpen, onToggle }) => {
                         : 'text-[#26415E] hover:bg-white/60 hover:text-[#0B1B32]'
                       }
                     `}
-                    onClick={() => window.innerWidth < 1024 && onToggle()}
+                    onClick={() => {
+                      if (window.innerWidth < 1024) onToggle()
+                    }}
                   >
                     <Icon className="h-5 w-5" />
                     <span className="font-medium">{item.label}</span>
@@ -131,7 +136,19 @@ const AdminSidebar = ({ isOpen, onToggle }) => {
           </motion.div>
         )}
       </AnimatePresence>
-    </>
+
+      {/* Main content with blur/scale when sidebar is open */}
+      <motion.main
+        className="flex-1"
+        animate={{
+          scale: isOpen ? 0.97 : 1,
+          filter: isOpen ? 'blur(2px)' : 'blur(0px)',
+        }}
+        transition={{ duration: 0.3, ease: 'easeInOut' }}
+      >
+        {children}
+      </motion.main>
+    </div>
   )
 }
 
