@@ -5,16 +5,32 @@ import { PageLoader } from "../../../components/LoadingSpinner"
 import { formatDate } from "../../../utils/helpers"
 import MatchModal from "../../../components/MatchModal"
 
+// Glassmorphism Toast
+const Toast = ({ message, onClose }) => {
+  if (!message) return null
+  return (
+    <div className="fixed bottom-6 right-6 z-50">
+      <div className="backdrop-blur-lg bg-white/20 border border-white/30 shadow-lg text-white px-6 py-3 rounded-2xl animate-fade-in-up">
+        <p className="font-medium">{message}</p>
+        <button
+          className="ml-4 text-sm underline hover:text-yellow-300"
+          onClick={onClose}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  )
+}
+
 const MatchManager = () => {
   const [matches, setMatches] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
-  const [message, setMessage] = useState(null) // ✅ notification
+  const [toastMessage, setToastMessage] = useState("")
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingMatch, setEditingMatch] = useState(null)
-  const [deletingMatch, setDeletingMatch] = useState(null) // ✅ for delete modal
-
   const [formData, setFormData] = useState({
     home_team: "",
     away_team: "",
@@ -26,26 +42,31 @@ const MatchManager = () => {
 
   useEffect(() => {
     fetchMatches()
+
+    // ✅ auto-open modal if redirected with ?add=new
     const params = new URLSearchParams(window.location.search)
-    if (params.get("add") === "new") openAddModal()
+    if (params.get("add") === "new") {
+      openAddModal()
+    }
   }, [])
 
   const fetchMatches = async () => {
     try {
       const { data, error } = await supabaseHelpers.getMatches()
       if (error) throw error
-      setMatches(data || [])
+
+      // ✅ Sort matches chronologically
+      const sortedMatches = (data || []).sort(
+        (a, b) => new Date(a.match_date) - new Date(b.match_date)
+      )
+
+      setMatches(sortedMatches)
     } catch (err) {
       setError("Failed to load matches")
       console.error("Error fetching matches:", err)
     } finally {
       setLoading(false)
     }
-  }
-
-  const showMessage = (text, type = "success") => {
-    setMessage({ text, type })
-    setTimeout(() => setMessage(null), 3000)
   }
 
   const handleSubmit = async (e) => {
@@ -62,11 +83,11 @@ const MatchManager = () => {
       if (editingMatch) {
         const { error } = await supabaseHelpers.updateMatch(editingMatch.id, matchData)
         if (error) throw error
-        showMessage("Match updated successfully ✅")
+        showToast("✅ Match updated successfully!")
       } else {
         const { error } = await supabaseHelpers.createMatch(matchData)
         if (error) throw error
-        showMessage("Match created successfully 🎉")
+        showToast("✅ Match created successfully!")
       }
 
       await fetchMatches()
@@ -77,22 +98,15 @@ const MatchManager = () => {
     }
   }
 
-  const confirmDelete = (match) => {
-    setDeletingMatch(match)
-  }
-
-  const handleDelete = async () => {
-    if (!deletingMatch) return
+  const handleDelete = async (matchId) => {
     try {
-      const { error } = await supabaseHelpers.deleteMatch(deletingMatch.id)
+      const { error } = await supabaseHelpers.deleteMatch(matchId)
       if (error) throw error
-      setMatches(matches.filter((m) => m.id !== deletingMatch.id))
-      showMessage("Match deleted 🗑️", "error")
+      showToast("🗑️ Match deleted successfully!")
+      await fetchMatches()
     } catch (err) {
       setError("Failed to delete match")
       console.error("Error deleting match:", err)
-    } finally {
-      setDeletingMatch(null)
     }
   }
 
@@ -101,7 +115,7 @@ const MatchManager = () => {
     setFormData({
       home_team: "",
       away_team: "",
-      match_date: new Date().toISOString().slice(0, 16),
+      match_date: new Date().toISOString().slice(0, 16), // ✅ default to now
       venue: "",
       ticket_price: "",
       total_seats: ""
@@ -135,16 +149,31 @@ const MatchManager = () => {
     })
   }
 
+  const showToast = (msg) => {
+    setToastMessage(msg)
+    setTimeout(() => setToastMessage(""), 3000)
+  }
+
+  const getDateLabel = (dateStr) => {
+    const today = new Date()
+    const matchDate = new Date(dateStr)
+    const diff = Math.floor((matchDate - today) / (1000 * 60 * 60 * 24))
+
+    if (diff === 0) return "Today"
+    if (diff === 1) return "Tomorrow"
+    return formatDate(dateStr, { weekday: "long", month: "short", day: "numeric" })
+  }
+
   if (loading) return <PageLoader />
   if (error) return <div className="text-center text-red-600 p-8">{error}</div>
 
   return (
-    <div className="min-h-screen bg-[#d6d8e0] p-6 space-y-6 relative">
+    <div className="min-h-screen bg-[#d6d8e0] p-6 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0b1b32]">Match Manager</h1>
-          <p className="text-[#5a5f6d]">Create, edit and manage football matches</p>
+          <p className="text-[#5a5f6d]">Create, edit, and manage football matches</p>
         </div>
         <button
           onClick={openAddModal}
@@ -158,46 +187,53 @@ const MatchManager = () => {
       {/* Matches List */}
       <div className="admin-card bg-white rounded-2xl shadow border border-[#c9ced8] p-6">
         {matches.length > 0 ? (
-          <div className="space-y-3">
-            {matches.map((match) => (
-              <div
-                key={match.id}
-                className="flex items-center justify-between p-3 bg-[#eeedf2] rounded-lg border border-[#c9ced8]"
-              >
-                <div className="flex items-center space-x-3">
-                  <SportsSoccer className="h-8 w-8 text-[#0b1b32]" />
-                  <div>
-                    <div className="font-semibold text-[#0b1b32]">
-                      {match.home_team} vs {match.away_team}
-                    </div>
-                    <div className="text-sm text-[#5a5f6d]">
-                      {formatDate(match.match_date, {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric"
-                      })}{" "}
-                      • {match.venue}
+          <div className="space-y-6">
+            {matches.map((match, idx) => (
+              <div key={match.id}>
+                {/* Group by date */}
+                {idx === 0 ||
+                new Date(matches[idx - 1].match_date).toDateString() !==
+                  new Date(match.match_date).toDateString() ? (
+                  <h2 className="text-lg font-semibold text-[#0b1b32] mb-2">
+                    {getDateLabel(match.match_date)}
+                  </h2>
+                ) : null}
+
+                <div className="flex items-center justify-between p-3 bg-[#eeedf2] rounded-lg border border-[#c9ced8]">
+                  <div className="flex items-center space-x-3">
+                    <SportsSoccer className="h-8 w-8 text-[#0b1b32]" />
+                    <div>
+                      <div className="font-semibold text-[#0b1b32]">
+                        {match.home_team} vs {match.away_team}
+                      </div>
+                      <div className="text-sm text-[#5a5f6d]">
+                        {formatDate(match.match_date, {
+                          hour: "2-digit",
+                          minute: "2-digit"
+                        })}{" "}
+                        • {match.venue}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="font-semibold text-[#0b1b32]">KES {match.ticket_price}</div>
-                  <button
-                    onClick={() => openEditModal(match)}
-                    className="p-2 rounded-full hover:bg-[#eeedf2] text-[#0b1b32]"
-                    title="Edit Match"
-                  >
-                    <Edit className="h-5 w-5" />
-                  </button>
-                  <button
-                    onClick={() => confirmDelete(match)}
-                    className="p-2 rounded-full hover:bg-red-100 text-red-600"
-                    title="Delete Match"
-                  >
-                    <Delete className="h-5 w-5" />
-                  </button>
+                  <div className="flex items-center space-x-4">
+                    <div className="font-semibold text-[#0b1b32]">
+                      KES {match.ticket_price}
+                    </div>
+                    <button
+                      onClick={() => openEditModal(match)}
+                      className="p-2 rounded-full hover:bg-[#eeedf2] text-[#0b1b32]"
+                      title="Edit Match"
+                    >
+                      <Edit className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(match.id)}
+                      className="p-2 rounded-full hover:bg-red-100 text-red-600"
+                      title="Delete Match"
+                    >
+                      <Delete className="h-5 w-5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -210,7 +246,7 @@ const MatchManager = () => {
         )}
       </div>
 
-      {/* Match Form Modal */}
+      {/* Modal */}
       <MatchModal
         isOpen={isModalOpen}
         onClose={closeModal}
@@ -220,46 +256,8 @@ const MatchManager = () => {
         editingMatch={editingMatch}
       />
 
-      {/* ✅ Glassmorphism Notification */}
-      {message && (
-        <div
-          className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-2xl shadow-lg backdrop-blur-md border
-          ${message.type === "error" ? "bg-red-500/30 text-red-800 border-red-400/50" : "bg-green-500/30 text-green-900 border-green-400/50"}
-        `}
-        >
-          {message.text}
-        </div>
-      )}
-
-      {/* ✅ Glassmorphism Delete Confirm Modal */}
-      {deletingMatch && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white/20 backdrop-blur-md border border-white/30 rounded-2xl shadow-lg p-6 w-full max-w-md text-center">
-            <h2 className="text-lg font-semibold text-[#0b1b32] mb-4">
-              Delete Match?
-            </h2>
-            <p className="text-[#5a5f6d] mb-6">
-              Are you sure you want to delete{" "}
-              <span className="font-bold">{deletingMatch.home_team} vs {deletingMatch.away_team}</span>?  
-              This action cannot be undone.
-            </p>
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={() => setDeletingMatch(null)}
-                className="px-4 py-2 rounded-xl bg-gray-200 hover:bg-gray-300 text-[#0b1b32] font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                className="px-4 py-2 rounded-xl bg-red-500/80 hover:bg-red-600 text-white font-medium"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Toast */}
+      <Toast message={toastMessage} onClose={() => setToastMessage("")} />
     </div>
   )
 }
