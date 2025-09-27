@@ -28,6 +28,7 @@ const MatchManager = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [toastMessage, setToastMessage] = useState("")
+  const [showUpcomingOnly, setShowUpcomingOnly] = useState(true)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingMatch, setEditingMatch] = useState(null)
@@ -164,6 +165,10 @@ const MatchManager = () => {
     return formatDate(dateStr, { weekday: "long", month: "short", day: "numeric" })
   }
 
+  const filteredMatches = showUpcomingOnly
+    ? matches.filter((m) => new Date(m.match_date) >= new Date())
+    : matches
+
   if (loading) return <PageLoader />
   if (error) return <div className="text-center text-red-600 p-8">{error}</div>
 
@@ -173,26 +178,36 @@ const MatchManager = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0b1b32]">Match Manager</h1>
-          <p className="text-[#5a5f6d]">Create, edit, and manage football matches</p>
+          <p className="text-[#5a5f6d]">
+            {showUpcomingOnly ? "Upcoming football matches" : "All football matches"}
+          </p>
         </div>
-        <button
-          onClick={openAddModal}
-          className="bg-[#FFD600] hover:bg-yellow-400 text-[#0b1b32] font-medium px-4 py-2 rounded-lg flex items-center space-x-2"
-        >
-          <Add className="h-4 w-4" />
-          <span>Add Match</span>
-        </button>
+        <div className="flex space-x-3">
+          <button
+            onClick={() => setShowUpcomingOnly(!showUpcomingOnly)}
+            className="bg-[#0b1b32] hover:bg-[#13294b] text-white font-medium px-4 py-2 rounded-lg"
+          >
+            {showUpcomingOnly ? "Show All Matches" : "Show Upcoming Only"}
+          </button>
+          <button
+            onClick={openAddModal}
+            className="bg-[#FFD600] hover:bg-yellow-400 text-[#0b1b32] font-medium px-4 py-2 rounded-lg flex items-center space-x-2"
+          >
+            <Add className="h-4 w-4" />
+            <span>Add Match</span>
+          </button>
+        </div>
       </div>
 
       {/* Matches List */}
       <div className="admin-card bg-white rounded-2xl shadow border border-[#c9ced8] p-6">
-        {matches.length > 0 ? (
+        {filteredMatches.length > 0 ? (
           <div className="space-y-6">
-            {matches.map((match, idx) => (
+            {filteredMatches.map((match, idx) => (
               <div key={match.id}>
                 {/* Group by date */}
                 {idx === 0 ||
-                new Date(matches[idx - 1].match_date).toDateString() !==
+                new Date(filteredMatches[idx - 1].match_date).toDateString() !==
                   new Date(match.match_date).toDateString() ? (
                   <h2 className="text-lg font-semibold text-[#0b1b32] mb-2">
                     {getDateLabel(match.match_date)}
@@ -241,7 +256,7 @@ const MatchManager = () => {
         ) : (
           <div className="text-center py-8 text-[#5a5f6d]">
             <SportsSoccer className="h-12 w-12 mx-auto mb-4 text-[#c8cdd7]" />
-            <p>No matches scheduled yet</p>
+            <p>{showUpcomingOnly ? "No upcoming matches" : "No matches scheduled yet"}</p>
           </div>
         )}
       </div>
